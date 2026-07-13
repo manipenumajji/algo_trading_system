@@ -59,3 +59,17 @@ PAPER_TRADING = True
 # =========================
 
 ENABLE_TELEGRAM_ALERTS = False
+
+# ==========================
+# Database Configuration
+# ==========================
+
+DB_HOST = "localhost"
+
+DB_PORT = 5432
+
+DB_NAME = "algo_trading"
+
+DB_USER = "postgres"
+
+DB_PASSWORD = "Mani@0303"

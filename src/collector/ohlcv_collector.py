@@ -1,18 +1,19 @@
-import os
 import pandas as pd
 from src.utils.logger import logger
 from src.exchanges.base_exchange import BaseExchange
 class OHLCVCollector:
 
     def __init__(
-        self,
-        exchange: BaseExchange,
-        symbols: list[str],
-        timeframes: list[str],
-        limit: int = 500
+    self,
+    exchange: BaseExchange,
+    db_manager,
+    symbols: list[str],
+    timeframes: list[str],
+    limit: int = 1000
     ):
 
         self.exchange = exchange
+        self.db_manager = db_manager
         self.symbols = symbols
         self.timeframes = timeframes
         self.limit = limit
@@ -48,38 +49,6 @@ class OHLCVCollector:
             )
             raise
 
-    def save_to_csv(
-        self,
-        df: pd.DataFrame,
-        symbol: str,
-        timeframe: str
-    ) -> None:
-
-        try:
-            os.makedirs(
-                "data",
-                exist_ok=True
-            )
-
-            filename = (
-                f"data/"
-                f"{symbol.replace('/', '_')}"
-                f"_{timeframe}.csv"
-            )
-
-            df.to_csv(filename)
-
-            logger.info(
-                f"Saved data to {filename}"
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Failed to save CSV "
-                f"for {symbol} {timeframe}: {e}"
-            )
-            raise
-
     def fetch_all(self) -> None:
 
         for symbol in self.symbols:
@@ -92,7 +61,7 @@ class OHLCVCollector:
                         timeframe=timeframe
                     )
 
-                    self.save_to_csv(
+                    self.db_manager.upsert_ohlcv(
                         df=df,
                         symbol=symbol,
                         timeframe=timeframe
