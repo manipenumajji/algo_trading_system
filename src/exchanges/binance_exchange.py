@@ -15,13 +15,15 @@ class BinanceExchange(BaseExchange):
         self,
         symbol: str,
         timeframe: str,
-        limit: int = 500
+        limit: int = 1000,
+        since=None
     ) -> pd.DataFrame:
 
         try:
             raw_data = self.exchange.fetch_ohlcv(
                 symbol=symbol,
                 timeframe=timeframe,
+                since=since,
                 limit=limit
             )
 

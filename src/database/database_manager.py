@@ -3,7 +3,7 @@ import pandas as pd
 from psycopg2.extras import execute_values
 
 from src.utils.logger import logger
-from src.config.config import (
+from config import (
     DB_HOST,
     DB_PORT,
     DB_NAME,
@@ -75,11 +75,47 @@ class DatabaseManager:
                 "OHLCV table created successfully."
             )
 
+            self.create_labels_table()
+
         except Exception as e:
+
             logger.error(
                 f"Failed to create table: {e}"
             )
+
             raise
+    def create_labels_table(self):
+
+        query = """
+        CREATE TABLE IF NOT EXISTS labels_v1 (
+            symbol VARCHAR(20),
+            timestamp TIMESTAMP,
+
+            long_label INTEGER,
+            short_label INTEGER,
+
+            entry_price DOUBLE PRECISION,
+
+            long_sl DOUBLE PRECISION,
+            long_tp DOUBLE PRECISION,
+
+            short_sl DOUBLE PRECISION,
+            short_tp DOUBLE PRECISION,
+
+            PRIMARY KEY (
+                symbol,
+                timestamp
+            )
+        );
+        """
+
+        self.cursor.execute(query)
+
+        self.connection.commit()
+
+        logger.info(
+            "Labels table created successfully."
+        )    
 
     def upsert_ohlcv(
         self,
@@ -255,3 +291,34 @@ class DatabaseManager:
                 f"Failed to close database connection: {e}"
             )
             raise
+    def create_labels_table(self):
+
+        query = """
+        CREATE TABLE IF NOT EXISTS labels_v1 (
+            symbol VARCHAR(20),
+            timestamp TIMESTAMP,
+
+            long_label INTEGER,
+            short_label INTEGER,
+
+            entry_price DOUBLE PRECISION,
+
+            long_sl DOUBLE PRECISION,
+            long_tp DOUBLE PRECISION,
+
+            short_sl DOUBLE PRECISION,
+            short_tp DOUBLE PRECISION,
+
+            PRIMARY KEY (
+                symbol,
+                timestamp
+            )
+        );
+        """
+
+        self.cursor.execute(query)
+        self.connection.commit()
+
+        logger.info(
+            "Labels table created successfully."
+        )    

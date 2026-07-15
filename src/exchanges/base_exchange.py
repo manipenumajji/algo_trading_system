@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 class BaseExchange(ABC):
     @abstractmethod
-    def fetch_ohlcv(self,symbol:str,timeframe:str,limit: int=500)->pd.DataFrame:# fetches market data
+    def fetch_ohlcv(self,symbol:str,timeframe:str,limit: int=1000,since=None)->pd.DataFrame:# fetches market data
         pass
     @abstractmethod
     def fetch_balance(self) ->dict: # To see the balance in the exchange 

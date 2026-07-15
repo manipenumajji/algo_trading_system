@@ -19,12 +19,29 @@ class OHLCVCollector:
         self.limit = limit
 
     def fetch_single(
-        self,
-        symbol: str,
-        timeframe: str
+    self,
+    symbol: str,
+    timeframe: str
     ) -> pd.DataFrame:
 
         try:
+            latest_timestamp = self.db_manager.get_latest_timestamp(
+                symbol=symbol,
+                timeframe=timeframe
+            )
+
+            since = None
+
+            if latest_timestamp is not None:
+                since = int(
+                    latest_timestamp.timestamp() * 1000
+                )
+
+            logger.info(
+                f"Latest database timestamp for "
+                f"{symbol} {timeframe}: {latest_timestamp}"
+            )
+
             logger.info(
                 f"Fetching {symbol} {timeframe} candles..."
             )
@@ -32,7 +49,8 @@ class OHLCVCollector:
             df = self.exchange.fetch_ohlcv(
                 symbol=symbol,
                 timeframe=timeframe,
-                limit=self.limit
+                limit=self.limit,
+                since=since
             )
 
             logger.info(
