@@ -25,12 +25,6 @@ class FVGDetector:
 
             timestamp = df.iloc[i]["timestamp"]
 
-            bullish_fvg_present = 0
-            bearish_fvg_present = 0
-
-            fvg_distance_pct = None
-            fvg_size_pct = None
-
             current_high = df.iloc[i]["high"]
             current_low = df.iloc[i]["low"]
             current_close = df.iloc[i]["close"]
@@ -38,7 +32,27 @@ class FVGDetector:
             atr = df.iloc[i]["atr_14"]
 
             # =====================================
-            # Bullish FVG
+            # Remove filled bullish FVGs
+            # =====================================
+
+            active_bullish_fvgs = [
+                fvg
+                for fvg in active_bullish_fvgs
+                if current_low > fvg["bottom"]
+            ]
+
+            # =====================================
+            # Remove filled bearish FVGs
+            # =====================================
+
+            active_bearish_fvgs = [
+                fvg
+                for fvg in active_bearish_fvgs
+                if current_high < fvg["top"]
+            ]
+
+            # =====================================
+            # Create bullish FVG
             # =====================================
 
             bullish_gap = (
@@ -51,8 +65,7 @@ class FVGDetector:
                 current_low >
                 df.iloc[i - 2]["high"]
                 and
-                bullish_gap >=
-                (
+                bullish_gap >= (
                     atr *
                     self.atr_multiplier
                 )
@@ -67,44 +80,20 @@ class FVGDetector:
                 active_bullish_fvgs.append(
                     {
                         "top": current_low,
-                        "bottom":
-                        df.iloc[i - 2]["high"],
-                        "midpoint":
-                        midpoint,
-                        "created_at":
-                        timestamp
+                        "bottom": df.iloc[i - 2]["high"],
+                        "midpoint": midpoint,
+                        "created_at": timestamp
                     }
                 )
 
-                bullish_fvg_present = 1
-
-                fvg_distance_pct = (
-                    abs(
-                        current_close
-                        -
-                        midpoint
-                    )
-                    /
-                    current_close
-                )
-
-                fvg_size_pct = (
-                    bullish_gap
-                    /
-                    current_close
-                )
-
-                logger.info(
-                    f"Bullish FVG "
-                    f"detected "
-                    f"bottom="
-                    f"{df.iloc[i - 2]['high']} "
-                    f"top="
-                    f"{current_low}"
+                logger.debug(
+                    f"Bullish FVG detected "
+                    f"bottom={df.iloc[i - 2]['high']} "
+                    f"top={current_low}"
                 )
 
             # =====================================
-            # Bearish FVG
+            # Create bearish FVG
             # =====================================
 
             bearish_gap = (
@@ -117,8 +106,7 @@ class FVGDetector:
                 current_high <
                 df.iloc[i - 2]["low"]
                 and
-                bearish_gap >=
-                (
+                bearish_gap >= (
                     atr *
                     self.atr_multiplier
                 )
@@ -132,110 +120,130 @@ class FVGDetector:
 
                 active_bearish_fvgs.append(
                     {
-                        "top":
-                        df.iloc[i - 2]["low"],
-                        "bottom":
-                        current_high,
-                        "midpoint":
-                        midpoint,
-                        "created_at":
-                        timestamp
+                        "top": df.iloc[i - 2]["low"],
+                        "bottom": current_high,
+                        "midpoint": midpoint,
+                        "created_at": timestamp
                     }
                 )
 
-                bearish_fvg_present = 1
+                logger.debug(
+                    f"Bearish FVG detected "
+                    f"top={df.iloc[i - 2]['low']} "
+                    f"bottom={current_high}"
+                )
 
-                fvg_distance_pct = (
+            # =====================================
+            # Active FVG state
+            # =====================================
+
+            bullish_fvg_present = (
+                1
+                if active_bullish_fvgs
+                else 0
+            )
+
+            bearish_fvg_present = (
+                1
+                if active_bearish_fvgs
+                else 0
+            )
+
+            # =====================================
+            # Distance to nearest bullish FVG
+            # =====================================
+
+            bullish_fvg_distance_pct = None
+
+            if active_bullish_fvgs:
+
+                nearest = min(
+                    active_bullish_fvgs,
+                    key=lambda x: abs(
+                        current_close
+                        -
+                        x["midpoint"]
+                    )
+                )
+
+                bullish_fvg_distance_pct = (
                     abs(
                         current_close
                         -
-                        midpoint
+                        nearest["midpoint"]
                     )
                     /
                     current_close
                 )
 
-                fvg_size_pct = (
-                    bearish_gap
-                    /
-                    current_close
-                )
-
-                logger.info(
-                    f"Bearish FVG "
-                    f"detected "
-                    f"top="
-                    f"{df.iloc[i - 2]['low']} "
-                    f"bottom="
-                    f"{current_high}"
-                )
-
             # =====================================
-            # Use nearest active FVG if no
-            # new FVG created on this candle
+            # Distance to nearest bearish FVG
             # =====================================
 
-            if (
-                bullish_fvg_present == 0
-                and
-                bearish_fvg_present == 0
-            ):
+            bearish_fvg_distance_pct = None
 
-                nearest_distance = None
+            if active_bearish_fvgs:
 
-                for fvg in (
-                    active_bullish_fvgs
-                    +
-                    active_bearish_fvgs
-                ):
-
-                    distance = (
-                        abs(
-                            current_close
-                            -
-                            fvg["midpoint"]
-                        )
-                        /
+                nearest = min(
+                    active_bearish_fvgs,
+                    key=lambda x: abs(
                         current_close
+                        -
+                        x["midpoint"]
                     )
+                )
 
-                    if (
-                        nearest_distance
-                        is None
-                        or
-                        distance <
-                        nearest_distance
-                    ):
+                bearish_fvg_distance_pct = (
+                    abs(
+                        current_close
+                        -
+                        nearest["midpoint"]
+                    )
+                    /
+                    current_close
+                )
 
-                        nearest_distance = (
-                            distance
-                        )
+            # =====================================
+            # Size
+            # =====================================
 
-                        fvg_distance_pct = (
-                            distance
-                        )
+            fvg_size_pct = None
+
+            if bullish_fvg_present:
+                fvg_size_pct = (
+                    (
+                        active_bullish_fvgs[-1]["top"]
+                        -
+                        active_bullish_fvgs[-1]["bottom"]
+                    )
+                    /
+                    current_close
+                )
+
+            elif bearish_fvg_present:
+                fvg_size_pct = (
+                    (
+                        active_bearish_fvgs[-1]["top"]
+                        -
+                        active_bearish_fvgs[-1]["bottom"]
+                    )
+                    /
+                    current_close
+                )
 
             features.append(
                 {
-                    "timestamp":
-                    timestamp,
-
-                    "bullish_fvg_present":
-                    bullish_fvg_present,
-
-                    "bearish_fvg_present":
-                    bearish_fvg_present,
-
-                    "fvg_distance_pct":
-                    fvg_distance_pct,
-
-                    "fvg_size_pct":
-                    fvg_size_pct
+                    "timestamp": timestamp,
+                    "bullish_fvg_present": bullish_fvg_present,
+                    "bearish_fvg_present": bearish_fvg_present,
+                    "bullish_fvg_distance_pct": bullish_fvg_distance_pct,
+                    "bearish_fvg_distance_pct": bearish_fvg_distance_pct,
+                    "fvg_size_pct": fvg_size_pct
                 }
             )
 
         logger.info(
-            f"FVG detection completed."
+            "FVG detection completed."
         )
 
         return pd.DataFrame(

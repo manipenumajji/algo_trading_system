@@ -1,4 +1,5 @@
 import pandas as pd
+from collections import defaultdict
 
 from src.utils.logger import logger
 
@@ -19,13 +20,15 @@ class PremiumDiscountDetector:
         current_swing_high = None
         current_swing_low = None
 
-        swing_map = {}
+        swing_map = defaultdict(list)
+
+        invalid_structure_logged = False
 
         for _, swing in swings.iterrows():
 
             swing_map[
                 swing["timestamp"]
-            ] = swing
+            ].append(swing)
 
         for _, candle in df.iterrows():
 
@@ -39,49 +42,99 @@ class PremiumDiscountDetector:
             pd_position = None
             equilibrium_price = None
 
-            # -------------------------
+            # =====================================
             # Update latest swings
-            # -------------------------
+            # =====================================
 
             if timestamp in swing_map:
 
-                swing = swing_map[timestamp]
+                for swing in swing_map[timestamp]:
 
-                if swing["type"] == "high":
-                    current_swing_high = (
-                        swing["price"]
-                    )
+                    if swing["type"] == "high":
+                        current_swing_high = (
+                            swing["price"]
+                        )
 
-                elif swing["type"] == "low":
-                    current_swing_low = (
-                        swing["price"]
-                    )
+                    elif swing["type"] == "low":
+                        current_swing_low = (
+                            swing["price"]
+                        )
 
-            # Cannot calculate without range
+            # =====================================
+            # Validation
+            # =====================================
+
+            if (
+                current_swing_high is not None
+                and
+                current_swing_low is not None
+            ):
+
+                if (
+                    current_swing_high <=
+                    current_swing_low
+                ):
+
+                    if not invalid_structure_logged:
+
+                        logger.warning(
+                            f"Invalid premium/discount "
+                            f"range at {timestamp}: "
+                            f"high={current_swing_high}, "
+                            f"low={current_swing_low}"
+                        )
+
+                        invalid_structure_logged = True
+
+                else:
+
+                    invalid_structure_logged = False
+
+            # =====================================
+            # Cannot calculate zones
+            # =====================================
+
             if (
                 current_swing_high is None
                 or
                 current_swing_low is None
+                or
+                current_swing_high <= current_swing_low
             ):
 
                 results.append(
                     {
-                        "timestamp": timestamp,
-                        "premium_zone": 0,
-                        "discount_zone": 0,
-                        "equilibrium_zone": 0,
-                        "pd_position": None,
-                        "equilibrium_price": None,
-                        "range_high": None,
-                        "range_low": None
+                        "timestamp":
+                        timestamp,
+
+                        "premium_zone":
+                        0,
+
+                        "discount_zone":
+                        0,
+
+                        "equilibrium_zone":
+                        0,
+
+                        "pd_position":
+                        None,
+
+                        "equilibrium_price":
+                        None,
+
+                        "range_high":
+                        None,
+
+                        "range_low":
+                        None
                     }
                 )
 
                 continue
 
-            # -------------------------
-            # Range midpoint
-            # -------------------------
+            # =====================================
+            # Midpoint
+            # =====================================
 
             equilibrium_price = (
                 current_swing_high
@@ -89,7 +142,10 @@ class PremiumDiscountDetector:
                 current_swing_low
             ) / 2
 
-            # Position inside range
+            # =====================================
+            # Position in range
+            # =====================================
+
             pd_position = (
                 (
                     close_price
@@ -104,17 +160,20 @@ class PremiumDiscountDetector:
                 )
             )
 
-            # -------------------------
-            # Zone Classification
-            # -------------------------
+            # =====================================
+            # Classification
+            # =====================================
 
             if pd_position < 0.45:
+
                 discount_zone = 1
 
             elif pd_position > 0.55:
+
                 premium_zone = 1
 
             else:
+
                 equilibrium_zone = 1
 
             results.append(
@@ -146,8 +205,7 @@ class PremiumDiscountDetector:
             )
 
         logger.info(
-            "Premium/Discount "
-            "detection completed."
+            "Premium/Discount detection completed."
         )
 
         return pd.DataFrame(

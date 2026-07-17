@@ -95,6 +95,7 @@ class DatasetBuilder:
         dataset = dataset.reset_index(
             drop=True
         )
+        dataset = dataset.fillna(0)
 
         print(
             f"Final dataset size: "

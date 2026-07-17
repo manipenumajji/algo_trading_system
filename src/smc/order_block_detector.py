@@ -7,9 +7,15 @@ class OrderBlockDetector:
 
     def __init__(
         self,
-        lookback=10
+        lookback=20,
+        displacement_multiplier=1.5
     ):
+
         self.lookback = lookback
+
+        self.displacement_multiplier = (
+            displacement_multiplier
+        )
 
     def detect(
         self,
@@ -43,21 +49,29 @@ class OrderBlockDetector:
                 df.iloc[i]["close"]
             )
 
-            bullish_ob_present = 0
-            bearish_ob_present = 0
+            # ==================================
+            # Remove invalid bullish OBs
+            # ==================================
 
-            bullish_ob_distance = None
-            bearish_ob_distance = None
+            bullish_obs = [
+                ob
+                for ob in bullish_obs
+                if close_price > ob["low"]
+            ]
 
-            bullish_ob_high = None
-            bullish_ob_low = None
+            # ==================================
+            # Remove invalid bearish OBs
+            # ==================================
 
-            bearish_ob_high = None
-            bearish_ob_low = None
+            bearish_obs = [
+                ob
+                for ob in bearish_obs
+                if close_price < ob["high"]
+            ]
 
-            # ===================================
-            # Bullish Order Block
-            # ===================================
+            # ==================================
+            # Create bullish OB
+            # ==================================
 
             if (
                 timestamp in bos_map
@@ -78,58 +92,44 @@ class OrderBlockDetector:
 
                     candle = df.iloc[j]
 
-                    # last bearish candle
                     if (
                         candle["close"]
                         <
                         candle["open"]
                     ):
 
-                        bullish_ob_low = (
-                            candle["low"]
-                        )
-
-                        bullish_ob_high = (
-                            candle["high"]
-                        )
-
-                        midpoint = (
-                            bullish_ob_low
-                            +
-                            bullish_ob_high
-                        ) / 2
-
                         bullish_obs.append(
                             {
                                 "high":
-                                bullish_ob_high,
+                                candle["high"],
 
                                 "low":
-                                bullish_ob_low,
+                                candle["low"],
 
                                 "midpoint":
-                                midpoint,
+                                (
+                                    candle["high"]
+                                    +
+                                    candle["low"]
+                                ) / 2,
 
                                 "created_at":
                                 timestamp
                             }
                         )
 
-                        bullish_ob_present = 1
-
-                        logger.info(
-                            f"Bullish OB "
-                            f"created "
-                            f"{bullish_ob_low}"
+                        logger.debug(
+                            f"Bullish OB created "
+                            f"{candle['low']}"
                             f"-"
-                            f"{bullish_ob_high}"
+                            f"{candle['high']}"
                         )
 
                         break
 
-            # ===================================
-            # Bearish Order Block
-            # ===================================
+            # ==================================
+            # Create bearish OB
+            # ==================================
 
             if (
                 timestamp in bos_map
@@ -150,124 +150,133 @@ class OrderBlockDetector:
 
                     candle = df.iloc[j]
 
-                    # last bullish candle
                     if (
                         candle["close"]
                         >
                         candle["open"]
                     ):
 
-                        bearish_ob_low = (
-                            candle["low"]
-                        )
-
-                        bearish_ob_high = (
-                            candle["high"]
-                        )
-
-                        midpoint = (
-                            bearish_ob_low
-                            +
-                            bearish_ob_high
-                        ) / 2
-
                         bearish_obs.append(
                             {
                                 "high":
-                                bearish_ob_high,
+                                candle["high"],
 
                                 "low":
-                                bearish_ob_low,
+                                candle["low"],
 
                                 "midpoint":
-                                midpoint,
+                                (
+                                    candle["high"]
+                                    +
+                                    candle["low"]
+                                ) / 2,
 
                                 "created_at":
                                 timestamp
                             }
                         )
 
-                        bearish_ob_present = 1
-
-                        logger.info(
-                            f"Bearish OB "
-                            f"created "
-                            f"{bearish_ob_low}"
+                        logger.debug(
+                            f"Bearish OB created "
+                            f"{candle['low']}"
                             f"-"
-                            f"{bearish_ob_high}"
+                            f"{candle['high']}"
                         )
 
                         break
 
-            # ===================================
-            # Distance to nearest bullish OB
-            # ===================================
+            # ==================================
+            # Active OB status
+            # ==================================
 
-            nearest_distance = None
+            bullish_ob_present = (
+                1
+                if len(
+                    bullish_obs
+                ) > 0
+                else 0
+            )
 
-            for ob in bullish_obs:
+            bearish_ob_present = (
+                1
+                if len(
+                    bearish_obs
+                ) > 0
+                else 0
+            )
 
-                distance = (
+            bullish_ob_distance = None
+            bearish_ob_distance = None
+
+            bullish_ob_high = None
+            bullish_ob_low = None
+
+            bearish_ob_high = None
+            bearish_ob_low = None
+
+            # nearest bullish OB
+
+            if bullish_obs:
+
+                nearest = min(
+                    bullish_obs,
+                    key=lambda x:
                     abs(
                         close_price
                         -
-                        ob["midpoint"]
+                        x["midpoint"]
+                    )
+                )
+
+                bullish_ob_distance = (
+                    abs(
+                        close_price
+                        -
+                        nearest["midpoint"]
                     )
                     /
                     close_price
                 )
 
-                if (
-                    nearest_distance
-                    is None
-                    or
-                    distance
-                    <
-                    nearest_distance
-                ):
+                bullish_ob_high = (
+                    nearest["high"]
+                )
 
-                    nearest_distance = (
-                        distance
-                    )
+                bullish_ob_low = (
+                    nearest["low"]
+                )
 
-            bullish_ob_distance = (
-                nearest_distance
-            )
+            # nearest bearish OB
 
-            # ===================================
-            # Distance to nearest bearish OB
-            # ===================================
+            if bearish_obs:
 
-            nearest_distance = None
-
-            for ob in bearish_obs:
-
-                distance = (
+                nearest = min(
+                    bearish_obs,
+                    key=lambda x:
                     abs(
                         close_price
                         -
-                        ob["midpoint"]
+                        x["midpoint"]
+                    )
+                )
+
+                bearish_ob_distance = (
+                    abs(
+                        close_price
+                        -
+                        nearest["midpoint"]
                     )
                     /
                     close_price
                 )
 
-                if (
-                    nearest_distance
-                    is None
-                    or
-                    distance
-                    <
-                    nearest_distance
-                ):
+                bearish_ob_high = (
+                    nearest["high"]
+                )
 
-                    nearest_distance = (
-                        distance
-                    )
-
-            bearish_ob_distance = (
-                nearest_distance
-            )
+                bearish_ob_low = (
+                    nearest["low"]
+                )
 
             results.append(
                 {
@@ -301,8 +310,7 @@ class OrderBlockDetector:
             )
 
         logger.info(
-            "Order Block detection "
-            "completed."
+            "Order Block detection completed."
         )
 
         return pd.DataFrame(

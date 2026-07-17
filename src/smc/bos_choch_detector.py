@@ -1,4 +1,5 @@
 import pandas as pd
+from collections import defaultdict
 
 from src.utils.logger import logger
 
@@ -12,7 +13,7 @@ class BOSCHOCHDetector:
         self,
         df: pd.DataFrame,
         swings: pd.DataFrame
-    ):
+    ) -> pd.DataFrame:
 
         features = []
 
@@ -22,13 +23,12 @@ class BOSCHOCHDetector:
         latest_swing_high = None
         latest_swing_low = None
 
-        swing_map = {}
+        swing_map = defaultdict(list)
 
         for _, swing in swings.iterrows():
-
             swing_map[
                 swing["timestamp"]
-            ] = swing
+            ].append(swing)
 
         for _, row in df.iterrows():
 
@@ -43,20 +43,20 @@ class BOSCHOCHDetector:
 
             if timestamp in swing_map:
 
-                swing = swing_map[timestamp]
+                for swing in swing_map[timestamp]:
 
-                if swing["type"] == "high":
-                    latest_swing_high = (
-                        swing["price"]
-                    )
+                    if swing["type"] == "high":
+                        latest_swing_high = (
+                            swing["price"]
+                        )
 
-                elif swing["type"] == "low":
-                    latest_swing_low = (
-                        swing["price"]
-                    )
+                    elif swing["type"] == "low":
+                        latest_swing_low = (
+                            swing["price"]
+                        )
 
             # -------------------------
-            # Bullish BOS
+            # Bullish BOS / CHOCH
             # -------------------------
 
             if (
@@ -66,29 +66,36 @@ class BOSCHOCHDetector:
                 latest_swing_high
             ):
 
+                broken_level = (
+                    latest_swing_high
+                )
+
                 bullish_bos = 1
                 bos_count += 1
-
-                logger.info(
-                    f"Bullish BOS detected "
-                    f"close={close_price} "
-                    f"break={latest_swing_high}"
-                )
 
                 if current_trend == -1:
 
                     bullish_choch = 1
 
-                    logger.info(
-                        f"Bullish CHOCH "
-                        f"detected "
-                        f"close={close_price}"
+                    logger.debug(
+                        f"Bullish CHOCH detected "
+                        f"close={close_price} "
+                        f"break={broken_level}"
+                    )
+
+                else:
+
+                    logger.debug(
+                        f"Bullish BOS detected "
+                        f"close={close_price} "
+                        f"break={broken_level}"
                     )
 
                 current_trend = 1
+                latest_swing_high = None
 
             # -------------------------
-            # Bearish BOS
+            # Bearish BOS / CHOCH
             # -------------------------
 
             elif (
@@ -98,26 +105,33 @@ class BOSCHOCHDetector:
                 latest_swing_low
             ):
 
+                broken_level = (
+                    latest_swing_low
+                )
+
                 bearish_bos = 1
                 bos_count += 1
-
-                logger.info(
-                    f"Bearish BOS detected "
-                    f"close={close_price} "
-                    f"break={latest_swing_low}"
-                )
 
                 if current_trend == 1:
 
                     bearish_choch = 1
 
-                    logger.info(
-                        f"Bearish CHOCH "
-                        f"detected "
-                        f"close={close_price}"
+                    logger.debug(
+                        f"Bearish CHOCH detected "
+                        f"close={close_price} "
+                        f"break={broken_level}"
+                    )
+
+                else:
+
+                    logger.debug(
+                        f"Bearish BOS detected "
+                        f"close={close_price} "
+                        f"break={broken_level}"
                     )
 
                 current_trend = -1
+                latest_swing_low = None
 
             features.append(
                 {
@@ -151,8 +165,7 @@ class BOSCHOCHDetector:
             )
 
         logger.info(
-            f"BOS/CHOCH detection "
-            f"completed."
+            "BOS/CHOCH detection completed."
         )
 
         return pd.DataFrame(

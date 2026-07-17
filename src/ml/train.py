@@ -1,4 +1,5 @@
 import joblib
+import os
 
 from sklearn.metrics import (
     accuracy_score,
@@ -58,17 +59,20 @@ class Trainer:
 
         precision = precision_score(
             y_test,
-            predictions
+            predictions,
+            zero_division=0
         )
 
         recall = recall_score(
             y_test,
-            predictions
+            predictions,
+            zero_division=0
         )
 
         f1 = f1_score(
             y_test,
-            predictions
+            predictions,
+            zero_division=0
         )
 
         logger.info(
@@ -122,8 +126,7 @@ class Trainer:
                 X,
                 y,
                 test_size=0.2,
-                random_state=42,
-                shuffle=True
+                shuffle=False
             )
         )
 
@@ -182,6 +185,10 @@ class Trainer:
             f"Best F1 score: "
             f"{best_score:.4f}"
         )
+        os.makedirs(
+        os.path.dirname(model_file),
+        exist_ok=True
+    )
 
         joblib.dump(
             best_model,

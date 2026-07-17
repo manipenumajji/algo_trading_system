@@ -3,11 +3,14 @@ import psycopg2
 
 from ta.volatility import AverageTrueRange
 
+from src.smc.market_structure_engine import MarketStructureEngine
+
 
 class FeatureEngine:
 
     def __init__(self, db_config):
         self.db_config = db_config
+        self.market_structure_engine = MarketStructureEngine()
 
     def get_connection(self):
         return psycopg2.connect(**self.db_config)
@@ -183,6 +186,8 @@ class FeatureEngine:
             df["hour_of_day"]
             .apply(self.get_session)
         )
+
+        df = self.market_structure_engine.generate_features(df)
 
         return df
 
